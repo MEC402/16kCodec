@@ -1,0 +1,35 @@
+
+======================
+OVERVIEW
+======================
+
+The codec we are developing for our 360 3D videos is based on object movement and thus in pixel differences. When an object is moving the pixels belonging to the object change in most of the cases. Depending on the characteristics of the object (e.g. color, shape, and texture) the pixel differences may not be enough to track the object's movement. For this project, we assume that the camera is still in one place and some objects are moving around. Because the lighting conditions affect the capture of the camera, we assumed that the background lighting does not change.
+
+Objects may have arbitrary movements, generating different cases which we have to handle to create a robust codec. In this document, we listed the possible test cases we can encounter while capturing moving objects around a still camera. As we develop the technique, we can add more cases that we did not think about so the evaluation of the system is more solid.
+
+
+
+======================
+TEST CASES
+======================
+
+The test cases are focused for a room environment with the camera still in the center of it. Objects will move arbitrary around the camera.
+
+--No object cases--
+-------------------
+- Empty room (No moving objects)
+
+
+--One object cases--
+--------------------
+- One object moving the entire video sequence
+- One object moving, after some time it stops and does not move any longer
+- One still object and after some time it starts moving for the rest of the video sequence
+- One object moving, after some time stops and then resumes it's movement
+- One object passes behind a still object
+
+
+--Multiple object cases--
+-------------------------
+- An increasing number of objects at the same time without occluding [5, 10, 20, 40, ...]
+- Two objects occluding each other
