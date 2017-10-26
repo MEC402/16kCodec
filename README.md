@@ -44,7 +44,7 @@ To test my program I listed the possible cases I can encounter while detecting t
 
 
 ## The paper
-Together with the development of this project, there is a paper which explains all the steps this project performs. This paper is located in [overleaf] (https://www.overleaf.com/11703920rystkrknnggx) , it has read and write
+Together with the development of this project, there is a paper which explains all the steps this project performs. This paper is located in [overleaf](https://www.overleaf.com/11703920rystkrknnggx) , it has read and write
 permissions.
 
 The paper is still in the writing process and thus it is not fisnished.
