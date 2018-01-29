@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 from tracker import Tracker
+from tqdm import tqdm
+import Module_MovementDetection as md
 import video
 
 
@@ -87,6 +89,24 @@ def point_distance(A, B):
     return ( (A[0]-B[0])**2 + (A[1]-B[1])**2 ) **0.5
 
 
+def get_bin(v, n):      # v is the vale to convert, n the bit amount to use
+      return format(v, 'b').zfill(n)
+
+
+# Returns a list with the image coded in binary.
+# The first two elements represent the size of the image (16bits per dimension)
+# The rest of the elements are the pixels. The RGB channels are coded separately (8 bits per channel).
+def image_to_binary_array(img):     
+      shape = img.shape
+      bin_array = [shape[0], shape[1]]
+      for i in range(0, shape[0]):
+            for j in range(0, shape[1]):
+                  r, g, b = img[i,j]
+                  bin_array.append(int(r))
+                  bin_array.append(int(g))
+                  bin_array.append(int(b))
+      return bin_array
+
 
 
 
@@ -99,7 +119,7 @@ tracker = Tracker()
 
 #%% LOAD THE VIDEO
 
-v, frame_count, frame_heigth, frame_width = video.load_video('../videos/01_01.mpg')
+v, frame_count, frame_heigth, frame_width = video.load_video('../videos/Test_video_0_reduced.mp4')
 tracker.fillFrames(v)
 
 
@@ -107,24 +127,27 @@ tracker.fillFrames(v)
 #%% LOCAL FRAME DIFFERENCES
 
 v_background = cv2.imread("background.png")
-#f_d = [cv2.absdiff(v[f], v[f-1]) for f in range(1,len(v))]
-f_d = [cv2.absdiff(v[f], v_background) for f in range(1,len(v))]
+#f_d = md.detect_movement(v, n=2)
+#f_d = md.detect_movement(v, mode="background_difference", background_img=v_background)
+f_d = md.detect_movement(v, mode="optical_flow")
 
 video.show_video("video", f_d)
 
 
 #%% CANDIDATE PIXEL CLASSIFICATION
 
-epsilon = 1
+epsilon = 20
 kernel1 = np.ones((3,3), np.uint8)
 kernel2 = np.ones((7,7), np.uint8)
 dilate_it = 10
 
 f_c = [cv2.threshold(cv2.cvtColor(f,cv2.COLOR_BGR2GRAY), epsilon, 255, cv2.THRESH_BINARY)[1] for f in f_d]
 
+f_c = [cv2.dilate(f, kernel1, iterations = dilate_it) for f in f_c]
+f_c = [cv2.morphologyEx(f, cv2.MORPH_CLOSE, kernel2) for f in f_c]
 f_c = [cv2.erode(f, kernel1, iterations = dilate_it) for f in f_c]
 f_c = [cv2.dilate(f, kernel1, iterations = dilate_it) for f in f_c]
-f_c = [cv2.erode(f, kernel1, iterations = dilate_it) for f in f_c]
+#f_c = [cv2.erode(f, kernel1, iterations = dilate_it) for f in f_c]
 f_c = [cv2.morphologyEx(f, cv2.MORPH_OPEN, kernel2) for f in f_c]
 f_c = [cv2.morphologyEx(f, cv2.MORPH_CLOSE, kernel2) for f in f_c]
 
@@ -152,7 +175,7 @@ del(connectivity)
 #%% MASK GENERATION
 
 f_o = []
-for f in range(0, len(f_ccl)):
+for f in tqdm(range(0, len(f_ccl))):
     f_o.append([np.uint8(f_ccl[f] == i)*255 for i in range(1, np.max(f_ccl[f])+1)])
 
 max_obj_number = sum([len(x) for x in f_o])
@@ -165,23 +188,23 @@ max_obj_number = sum([len(x) for x in f_o])
 #%% MASK ID ASSIGNATION
 
 # Generate bounding boxes ------------------------------------------
-for f in range(0, len(f_o)):
+for f in tqdm(range(0, len(f_o))):
     frame = tracker.getFrame(f)
     for c in range(0,len(f_o[f])):
         contours = cv2.findContours(f_o[f][c], 2, 2)[1][0]
         frame.appendObject(cv2.boundingRect(contours))
 
- # Show the bounding boxes
-for f in range(0, len(f_o)):
-     img = np.zeros_like(v[f])
-     img = cv2.add(img, cv2.cvtColor(f_c[f], cv2.COLOR_GRAY2BGR))
-     objects = tracker.getFrame(f).getObjects()
-     for c in range(0, len(objects)):
-         x, y, w, h = objects[c].getBbox()
-         img = cv2.rectangle(img, (x, y), (x+w, y+h), (0,255,0), 2)
-     cv2.imshow('rectangles',img)
-     cv2.waitKey(40)
-cv2.destroyAllWindows()
+# # Show the bounding boxes
+#for f in tqdm(range(0, len(f_o))):
+#     img = np.zeros_like(v[f])
+#     img = cv2.add(img, cv2.cvtColor(f_c[f], cv2.COLOR_GRAY2BGR))
+#     objects = tracker.getFrame(f).getObjects()
+#     for c in range(0, len(objects)):
+#         x, y, w, h = objects[c].getBbox()
+#         img = cv2.rectangle(img, (x, y), (x+w, y+h), (0,255,0), 2)
+#     cv2.imshow('rectangles',img)
+#     cv2.waitKey(40)
+#cv2.destroyAllWindows()
 
 
 # Assign an ID to each object-bbox -----------------------------------
@@ -194,7 +217,7 @@ id_frames = []
 tracked = []
 prev_objects = []
 OBJECT_THRESHOLD = 50 # maximum distance to determine if it is the same object (after movemnt)
-for f in range(0, len(tracker.getFrames())):
+for f in tqdm(range(0, len(tracker.getFrames()))):
     canvas = np.zeros_like(v[0])
     frame = tracker.getFrame(f)
     objects = frame.getObjects()
@@ -211,8 +234,8 @@ video.show_video("video", id_frames)
 frame_foreground = [np.zeros((frame_heigth,frame_width), dtype=np.uint8) for _ in range(frame_count)] 
 frame_background = [np.zeros((frame_heigth,frame_width,3), dtype=np.uint8) for _ in range(frame_count)] 
 
-for f in range(0,100):
-      print(str(f) + " / " + str(frame_count))
+for f in tqdm(range(0,frame_count)):
+      #print(str(f) + " / " + str(frame_count))
       for i in range(0, frame_heigth):
             for j in range(0, frame_width):
                   foreground = False
@@ -232,6 +255,113 @@ for f in range(0,100):
                         if not foreground:
                               # assign the pixel as background
                               frame_background[f][i,j] = v[f][i,j] 
+
+
+
+#%% COMPRESSED FILE GENERATION
+
+
+frames = tracker.getFrames()
+file = open("output_video.16k", mode='w+b')
+
+# Write number and size of frames
+print("Writing frame count and size...")
+file.write(frame_count.to_bytes(4,'big'))   # 4 bytes
+file.write(frame_width.to_bytes(2,'big'))   # 2 bytes
+file.write(frame_heigth.to_bytes(2,'big'))  # 2 bytes
+print("Done!")
+
+# Write background image
+print("Writing background image...")
+background = cv2.imread("background.png")
+_, encoded_background = cv2.imencode(".png", background)
+file.write(background.shape[0].to_bytes(2,'big'))
+file.write(background.shape[1].to_bytes(2,'big'))
+file.write(encoded_background)
+print("Done!")
+
+# Write each frame's objects
+print("Writing frames' objects...")
+for f in tqdm(range(0, 100)):
+      objects = []
+      frame = tracker.getFrame(f)
+      file.write(len(frame.getObjects()).to_bytes(1,'big')) # 1 byte makes a maximum of 255 objects
+      for o in frame.getObjects():
+            x, y, w, h = o.getBbox()
+            file.write(x.to_bytes(2,'big'))
+            file.write(y.to_bytes(2,'big'))
+            file.write(h.to_bytes(2,'big'))
+            file.write(w.to_bytes(2,'big'))
+            obj_img = frame.getImage()[x:(x+w), y:(y+h)]
+            obj_bin_img = cv2.imencode(".bmp", obj_img)
+            file.write(obj_bin_img)
+            
+print("Done!")
+
+
+file.close()
+
+print("The video has been saved!")
+      
+
+
+
+
+#%% DECOMPRESS VIDEO FILE
+
+file = open("output_video.16k", mode='r+b')
+
+# Get number and size of frames
+print("Reading frame count and size...")
+comp_frame_count = int.from_bytes(file.read(4), 'big')
+comp_frame_width = int.from_bytes(file.read(2), 'big')
+comp_frame_heigth = int.from_bytes(file.read(2), 'big')
+print("Done!")
+
+# Read the background image
+print("Reading background image...")
+comp_back_heigth = int.from_bytes(file.read(2), 'big')
+comp_back_width = int.from_bytes(file.read(2), 'big')
+back_size = comp_back_heigth * comp_back_width * 3
+comp_encoded_background = np.frombuffer(file.read(back_size), dtype=np.uint8)
+comp_background = cv2.imdecode(comp_encoded_background, cv2.IMREAD_ANYCOLOR) 
+print("Done!")
+
+# Read each frame's objects
+print("Reading frames' objects...")
+comp_video = []
+for f in tqdm(range(0,comp_frame_count)):
+      comp_f_obj_count = int.from_bytes(file.read(1), 'big')
+      frame_back = comp_background.copy()
+      for o in range(0, comp_f_obj_count):
+            comp_o_x = int.from_bytes(file.read(2), 'big')
+            comp_o_y = int.from_bytes(file.read(2), 'big')
+            comp_o_h = int.from_bytes(file.read(2), 'big')
+            comp_o_w = int.from_bytes(file.read(2), 'big')
+            comp_o_img_size = comp_o_w * comp_o_h * 3
+            comp_o_encoded_img = np.frombuffer(file.read(comp_o_img_size), dtype=np.uint8)
+            comp_o_img = cv2.imdecode(comp_o_encoded_img, cv2.IMREAD_ANYCOLOR) 
+            frame_back[x:w, y:h] = comp_o_img
+      comp_video.append(frame_back)
+print("Done!")
+
+file.close()
+
+
+
+
+#%% STUFF
+
+
+
+
+
+
+
+
+
+
+
 
 tmp_v = []
 for f in range(len(tracker.getFrames())):

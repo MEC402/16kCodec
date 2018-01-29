@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from tracker import Tracker
 from sklearn.cluster import DBSCAN
+from tqdm import tqdm
 import video
 
 
@@ -100,7 +101,7 @@ tracker = Tracker()
 
 #%% LOAD THE VIDEO
 
-v, frame_count, frame_heigth, frame_width = video.load_video('../videos/01_01.mpg')
+v, frame_count, frame_heigth, frame_width = video.load_video('../videos/Test_video_1_reduced.mp4')
 tracker.fillFrames(v)
 
 
@@ -207,8 +208,8 @@ for f in range(0, len(tracker.getFrames())):
 frame_foreground = [np.zeros((frame_heigth,frame_width), dtype=np.uint8) for _ in range(frame_count)] 
 frame_background = [np.zeros((frame_heigth,frame_width,3), dtype=np.uint8) for _ in range(frame_count)] 
 
-for f in range(0,frame_count):
-      print(str(f) + " / " + str(frame_count))
+for f in tqdm(range(0,frame_count)):
+      #print(str(f) + " / " + str(frame_count))
       for i in range(0, frame_heigth):
             for j in range(0, frame_width):
                   foreground = False
@@ -224,10 +225,10 @@ for f in range(0,frame_count):
 ##                        # Search for stopped->move objects 
 ##                        if look_forward(i, j, f):
 ##                              foreground = True
-#                        
-                        if not foreground:
-                              # assign the pixel as background
-                              frame_background[f][i,j] = v[f][i,j] 
+                  
+                  if not foreground:
+                        # assign the pixel as background
+                        frame_background[f][i,j] = v[f][i,j] 
 
 #tmp_v = []
 #for f in range(len(tracker.getFrames())):
@@ -248,8 +249,8 @@ background = np.zeros((frame_heigth,frame_width,3), dtype=np.uint8)
 pixel_data = pixel_data = [[video_background[:,i,j] for i in range(frame_heigth)] for j in range(frame_width)]
 
 dbscan = DBSCAN(eps=10)
-for i in range(0,frame_width):
-      print(i)
+for i in tqdm(range(0,frame_width)):
+      #print(i)
       for j in range(0,frame_heigth):
             dbscan.fit(pixel_data[i][j])
             labels = dbscan.labels_
@@ -264,6 +265,8 @@ for i in range(0,frame_width):
 
 #background = np.mean((np.array(frame_background).astype(np.float32)), axis=0)
 cv2.imwrite("background.png", background)
-cv2.imshow("background", background)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+
+#%% SHOW BACKGROUND
+#cv2.imshow("background", background)
+#cv2.waitKey(0)
+#cv2.destroyAllWindows()

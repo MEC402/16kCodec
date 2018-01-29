@@ -1,5 +1,4 @@
 import cv2
-import numpy as np
 
 
 
@@ -27,6 +26,8 @@ def write_video(filename, v):
     
 def show_video(name, v):
     for f in v:
-        cv2.imshow(name, f)
-        cv2.waitKey(40)
+      cv2.imshow(name, f)
+      k = cv2.waitKey(40)
+      if k == 32:
+            break
     cv2.destroyAllWindows()
