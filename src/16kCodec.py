@@ -119,19 +119,20 @@ tracker = Tracker()
 
 #%% LOAD THE VIDEO
 
-v, frame_count, frame_heigth, frame_width = video.load_video('../videos/Test_video_0_reduced.mp4')
+v, frame_count, frame_heigth, frame_width = video.load_video('/cornea/16kCodec/16kCodec/videos/Test_video_1_reduced.mp4')
 tracker.fillFrames(v)
 
 
 
 #%% LOCAL FRAME DIFFERENCES
 
-v_background = cv2.imread("background.png")
+#v_background = cv2.imread("background.png")
 #f_d = md.detect_movement(v, n=2)
 #f_d = md.detect_movement(v, mode="background_difference", background_img=v_background)
-f_d = md.detect_movement(v, mode="optical_flow")
+print("Detecting movement")
+f_d = md.detect_movement(v, mode="frame_differences")
 
-video.show_video("video", f_d)
+#video.show_video("video", f_d)
 
 
 #%% CANDIDATE PIXEL CLASSIFICATION
@@ -158,13 +159,14 @@ del(epsilon)
 del(dilate_it)
 
 
-video.show_video("video", f_c)
+#video.show_video("video", f_c)
 
 
 #%% COMPUTE CCL
 
 connectivity = 8
 
+print("Computing CCL")
 f_ccl = [CCL(f, connectivity) for f in f_c]
 
 del(connectivity)
@@ -174,6 +176,7 @@ del(connectivity)
 
 #%% MASK GENERATION
 
+print("Generating masks")
 f_o = []
 for f in tqdm(range(0, len(f_ccl))):
     f_o.append([np.uint8(f_ccl[f] == i)*255 for i in range(1, np.max(f_ccl[f])+1)])
@@ -187,6 +190,7 @@ max_obj_number = sum([len(x) for x in f_o])
 
 #%% MASK ID ASSIGNATION
 
+print("Assigning ids to masks")
 # Generate bounding boxes ------------------------------------------
 for f in tqdm(range(0, len(f_o))):
     frame = tracker.getFrame(f)
@@ -228,7 +232,7 @@ for f in tqdm(range(0, len(tracker.getFrames()))):
                 draw_id_rect(canvas, o.getID(), o)                     
     id_frames.append(canvas)
 
-video.show_video("video", id_frames)
+#video.show_video("video", id_frames)
 
 
 frame_foreground = [np.zeros((frame_heigth,frame_width), dtype=np.uint8) for _ in range(frame_count)] 
@@ -260,6 +264,7 @@ for f in tqdm(range(0,frame_count)):
 
 #%% COMPRESSED FILE GENERATION
 
+print("GENERATING COMPRESSED VIDEO")
 
 frames = tracker.getFrames()
 file = open("output_video.16k", mode='w+b')
@@ -273,7 +278,7 @@ print("Done!")
 
 # Write background image
 print("Writing background image...")
-background = cv2.imread("background.png")
+background = cv2.imread("/cornea/16kCodec/16kCodec/videos/background.png")
 _, encoded_background = cv2.imencode(".png", background)
 file.write(background.shape[0].to_bytes(2,'big'))
 file.write(background.shape[1].to_bytes(2,'big'))
@@ -293,7 +298,7 @@ for f in tqdm(range(0, 100)):
             file.write(h.to_bytes(2,'big'))
             file.write(w.to_bytes(2,'big'))
             obj_img = frame.getImage()[x:(x+w), y:(y+h)]
-            obj_bin_img = cv2.imencode(".bmp", obj_img)
+            _, obj_bin_img = cv2.imencode(".bmp", obj_img)
             file.write(obj_bin_img)
             
 print("Done!")
@@ -308,6 +313,8 @@ print("The video has been saved!")
 
 
 #%% DECOMPRESS VIDEO FILE
+
+print("DECOMPRESSING VIDEO FILE ---------------")
 
 file = open("output_video.16k", mode='r+b')
 
@@ -361,20 +368,3 @@ file.close()
 
 
 
-
-
-tmp_v = []
-for f in range(len(tracker.getFrames())):
-      for o in tracker.getFrame(f).getObjects():
-            draw_id_rect(frame_background[f], o.getID(), o)
-            tmp_v.append(frame_background[f])
-video.show_video("video", tmp_v)
-
-video.show_video("video", frame_background)
-video.write_video("background_frames.mp4", frame_background)
-
-background = np.mean((np.array(frame_background).astype(np.float32))/255, axis=0)
-cv2.imwrite("background.png", background)
-cv2.imshow("background", background)
-cv2.waitKey(0)
-cv2.destroyAllWindows()

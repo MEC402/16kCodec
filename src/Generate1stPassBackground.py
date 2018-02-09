@@ -101,7 +101,7 @@ tracker = Tracker()
 
 #%% LOAD THE VIDEO
 
-v, frame_count, frame_heigth, frame_width = video.load_video('../videos/Test_video_1_reduced.mp4')
+v, frame_count, frame_heigth, frame_width = video.load_video('/cornea/16kCodec/16kCodec/videos/Test_video_1_reduced.mp4')
 tracker.fillFrames(v)
 
 
