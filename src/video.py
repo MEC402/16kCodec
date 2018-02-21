@@ -8,10 +8,10 @@ def load_video(argument_filename):
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     frame_heigth = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    for _ in range(0, frame_count):
+    for _ in range(0, frame_count-1):
         _, frame = cap.read()
         video.append(frame)
-    return video, frame_count, frame_heigth, frame_width
+    return video, len(video), frame_heigth, frame_width
 
 def write_video(filename, v):
     fourcc = cv2.VideoWriter_fourcc('M', 'P', '4', 'V')

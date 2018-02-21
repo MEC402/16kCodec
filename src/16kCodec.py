@@ -3,6 +3,7 @@ import numpy as np
 from tracker import Tracker
 from tqdm import tqdm
 import Module_MovementDetection as md
+import Image_Decoding as img_dec
 import video
 
 
@@ -119,9 +120,8 @@ tracker = Tracker()
 
 #%% LOAD THE VIDEO
 
-v, frame_count, frame_heigth, frame_width = video.load_video('/cornea/16kCodec/16kCodec/videos/Test_video_1_reduced.mp4')
+v, frame_count, frame_heigth, frame_width = video.load_video('../videos/Test_birds.mp4')
 tracker.fillFrames(v)
-
 
 
 #%% LOCAL FRAME DIFFERENCES
@@ -168,6 +168,7 @@ connectivity = 8
 
 print("Computing CCL")
 f_ccl = [CCL(f, connectivity) for f in f_c]
+print("Done!")
 
 del(connectivity)
 
@@ -184,8 +185,6 @@ for f in tqdm(range(0, len(f_ccl))):
 max_obj_number = sum([len(x) for x in f_o])
 
   
-
-
 
 
 #%% MASK ID ASSIGNATION
@@ -278,7 +277,7 @@ print("Done!")
 
 # Write background image
 print("Writing background image...")
-background = cv2.imread("/cornea/16kCodec/16kCodec/videos/background.png")
+background = cv2.imread("background.png")
 _, encoded_background = cv2.imencode(".png", background)
 file.write(background.shape[0].to_bytes(2,'big'))
 file.write(background.shape[1].to_bytes(2,'big'))
@@ -287,9 +286,10 @@ print("Done!")
 
 # Write each frame's objects
 print("Writing frames' objects...")
-for f in tqdm(range(0, 100)):
+for f in tqdm(range(0, frame_count)):
       objects = []
       frame = tracker.getFrame(f)
+      print(len(frame.getObjects()).to_bytes(1,'big'))
       file.write(len(frame.getObjects()).to_bytes(1,'big')) # 1 byte makes a maximum of 255 objects
       for o in frame.getObjects():
             x, y, w, h = o.getBbox()
@@ -317,6 +317,7 @@ print("The video has been saved!")
 print("DECOMPRESSING VIDEO FILE ---------------")
 
 file = open("output_video.16k", mode='r+b')
+byte_index = 12
 
 # Get number and size of frames
 print("Reading frame count and size...")
@@ -329,31 +330,42 @@ print("Done!")
 print("Reading background image...")
 comp_back_heigth = int.from_bytes(file.read(2), 'big')
 comp_back_width = int.from_bytes(file.read(2), 'big')
-back_size = comp_back_heigth * comp_back_width * 3
-comp_encoded_background = np.frombuffer(file.read(back_size), dtype=np.uint8)
-comp_background = cv2.imdecode(comp_encoded_background, cv2.IMREAD_ANYCOLOR) 
+#back_size = comp_back_heigth * comp_back_width * 3
+#comp_encoded_background = np.frombuffer(file.read(back_size + 14*8), dtype=np.uint8)
+png_data, read_bytes = img_dec.read_bin_png(file, byte_index)
+byte_index += read_bytes
+#comp_background = cv2.imdecode(comp_encoded_background, cv2.IMREAD_ANYCOLOR) 
+comp_background = img_dec.decode_bin_png(png_data)
 print("Done!")
+
 
 # Read each frame's objects
 print("Reading frames' objects...")
 comp_video = []
 for f in tqdm(range(0,comp_frame_count)):
       comp_f_obj_count = int.from_bytes(file.read(1), 'big')
+      print(byte_index)
+      byte_index += 1
       frame_back = comp_background.copy()
       for o in range(0, comp_f_obj_count):
             comp_o_x = int.from_bytes(file.read(2), 'big')
             comp_o_y = int.from_bytes(file.read(2), 'big')
             comp_o_h = int.from_bytes(file.read(2), 'big')
             comp_o_w = int.from_bytes(file.read(2), 'big')
-            comp_o_img_size = comp_o_w * comp_o_h * 3
-            comp_o_encoded_img = np.frombuffer(file.read(comp_o_img_size), dtype=np.uint8)
-            comp_o_img = cv2.imdecode(comp_o_encoded_img, cv2.IMREAD_ANYCOLOR) 
-            frame_back[x:w, y:h] = comp_o_img
+            byte_index += 8
+            #comp_o_img_size = comp_o_w * comp_o_h * 3
+            #comp_o_encoded_img = np.frombuffer(file.read(comp_o_img_size), dtype=np.uint8)
+            #comp_o_img = cv2.imdecode(comp_o_encoded_img, cv2.IMREAD_ANYCOLOR) 
+            png_data, read_bytes = img_dec.read_bin_png(file, byte_index)
+            byte_index += read_bytes
+            comp_o_img = img_dec.decode_bin_png(png_data)
+            frame_back[comp_o_x:comp_o_w, comp_o_y:comp_o_h] = comp_o_img
+            cv2.imshow("video", frame_back)
+            cv2.waitKey(30)
       comp_video.append(frame_back)
 print("Done!")
-
+cv2.destroyAllWindows()
 file.close()
-
 
 
 
@@ -361,7 +373,7 @@ file.close()
 
 
 
-
+video.show_video("video", comp_video)
 
 
 
