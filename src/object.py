@@ -12,7 +12,7 @@ class Object:
 	def __init__(self):
 		self.ID = -1
 		self.bbox = ()
-		self.activated_pixels = None
+		self.img = None
 
 
 
@@ -40,8 +40,8 @@ class Object:
 	def setBbox(self, box):
 		self.bbox = box
 
-	def getActivatedPixels(self):
-		return self.activated_pixels
+	def getImage(self):
+		return self.img
 
-	def setActivatedPixels(self, act_pix):
-		self.activated_pixels = act_pix
+	def setImage(self, img):
+		self.img = img

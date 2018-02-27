@@ -101,7 +101,7 @@ tracker = Tracker()
 
 #%% LOAD THE VIDEO
 
-v, frame_count, frame_heigth, frame_width = video.load_video('../videos/Test_birds.mp4')
+v, frame_count, frame_heigth, frame_width = video.load_video('../videos/Test_Bird_1object.mp4')
 tracker.fillFrames(v)
 
 

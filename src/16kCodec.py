@@ -5,6 +5,7 @@ from tqdm import tqdm
 import Module_MovementDetection as md
 import Image_Decoding as img_dec
 import video
+from ObjectManager import ObjectManager
 
 
 
@@ -120,7 +121,7 @@ tracker = Tracker()
 
 #%% LOAD THE VIDEO
 
-v, frame_count, frame_heigth, frame_width = video.load_video('../videos/Test_birds.mp4')
+v, frame_count, frame_heigth, frame_width = video.load_video('../videos/Test_Bird_1object.mp4')
 tracker.fillFrames(v)
 
 
@@ -234,6 +235,37 @@ for f in tqdm(range(0, len(tracker.getFrames()))):
 #video.show_video("video", id_frames)
 
 
+
+# Write the videos for each of the objects -------------------------------
+
+# Add all the objects to the object manager
+obj_manager = ObjectManager()
+for f in tqdm(range(0, len(tracker.getFrames()))):
+      frame = tracker.getFrame(f)
+      obj_manager.add_frame(frame.getObjects(),f)
+
+# Compute the maximum bbox for each of the objects
+obj_manager.compute_obj_max_bboxes()
+
+# Get the frames for each of the objects and write the videos
+max_bboxes = obj_manager.getMaxBboxObjects()
+for f in tqdm(range(0, len(tracker.getFrames()))):
+      frame = tracker.getFrame(f)
+      for obj in frame.getObjects():
+            x, y, w, h = obj.getBbox()
+            video_bbox_w, video_bbox_h = max_bboxes[obj.getID()]
+            if x + video_bbox_w >= frame_width:
+                  x = x - (x + video_bbox_w - frame_width)
+            if y + video_bbox_h >= frame_heigth:
+                  y = y - (y + video_bbox_h - frame_heigth)
+            obj.setImage(frame.getImage()[y:(y+video_bbox_h), x:(x+video_bbox_w)])
+      obj_manager.add_frame(frame.getObjects(),f)
+
+obj_manager.write_individual_videos("../output/objects/")
+
+
+#%% BACKGROUND/FOREGROUND SEGMENTATION
+
 frame_foreground = [np.zeros((frame_heigth,frame_width), dtype=np.uint8) for _ in range(frame_count)] 
 frame_background = [np.zeros((frame_heigth,frame_width,3), dtype=np.uint8) for _ in range(frame_count)] 
 
@@ -265,23 +297,22 @@ for f in tqdm(range(0,frame_count)):
 
 print("GENERATING COMPRESSED VIDEO")
 
+output_dir = "../output/"
+
 frames = tracker.getFrames()
-file = open("output_video.16k", mode='w+b')
+file_metadata = open(output_dir + "metadata.16k", mode='w')
 
 # Write number and size of frames
 print("Writing frame count and size...")
-file.write(frame_count.to_bytes(4,'big'))   # 4 bytes
-file.write(frame_width.to_bytes(2,'big'))   # 2 bytes
-file.write(frame_heigth.to_bytes(2,'big'))  # 2 bytes
+file_metadata.write(str(frame_count) + "\n")   
+file_metadata.write(str(frame_width) + "\n")   
+file_metadata.write(str(frame_heigth) + "\n")
 print("Done!")
 
 # Write background image
 print("Writing background image...")
 background = cv2.imread("background.png")
-_, encoded_background = cv2.imencode(".png", background)
-file.write(background.shape[0].to_bytes(2,'big'))
-file.write(background.shape[1].to_bytes(2,'big'))
-file.write(encoded_background)
+cv2.imwrite(output_dir + "background.jpg", background)
 print("Done!")
 
 # Write each frame's objects
@@ -289,22 +320,18 @@ print("Writing frames' objects...")
 for f in tqdm(range(0, frame_count)):
       objects = []
       frame = tracker.getFrame(f)
-      print(len(frame.getObjects()).to_bytes(1,'big'))
-      file.write(len(frame.getObjects()).to_bytes(1,'big')) # 1 byte makes a maximum of 255 objects
+      #print(len(frame.getObjects()).to_bytes(1,'big'))
+      #file_metadata.write(str(f) + "_" + str(len(frame.getObjects())) + "\n") 
       for o in frame.getObjects():
             x, y, w, h = o.getBbox()
-            file.write(x.to_bytes(2,'big'))
-            file.write(y.to_bytes(2,'big'))
-            file.write(h.to_bytes(2,'big'))
-            file.write(w.to_bytes(2,'big'))
-            obj_img = frame.getImage()[x:(x+w), y:(y+h)]
-            _, obj_bin_img = cv2.imencode(".bmp", obj_img)
-            file.write(obj_bin_img)
+            file_metadata.write(str(f) + "_" + str(o.getID()) + "_" +  str(x) + "_" +  str(y) + "_" +  str(w) + "_" +  str(h) + "\n")
+            obj_img = frame.getImage()[y:(y+h), x:(x+w)]
+            cv2.imwrite(output_dir + "frames/" + str(f) + "_" + str(o.getID()) + ".jpg", obj_img)
             
 print("Done!")
 
 
-file.close()
+file_metadata.close()
 
 print("The video has been saved!")
       
