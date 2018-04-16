@@ -18,7 +18,7 @@ def write_video(filename, v):
     isColor = False
     if len(v[0].shape) == 3:
         isColor = v[0].shape[2] == 3
-    out = cv2.VideoWriter(filename, fourcc, 20.0, (v[0].shape[1],v[0].shape[0]), isColor)
+    out = cv2.VideoWriter(filename, fourcc, 30.0, (v[0].shape[1],v[0].shape[0]), isColor)
     for f in range(0, len(v)):
         out.write(v[f])
     out.release()

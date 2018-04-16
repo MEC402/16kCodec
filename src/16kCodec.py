@@ -12,50 +12,51 @@ from ObjectManager import ObjectManager
 # iMAGE PROCESSING FUNCTIONS ---------------------------------------------
 
 def CCL(binary, connectivity):
-    ret, labels = cv2.connectedComponents(binary, connectivity)
-    return labels
+        ret, labels = cv2.connectedComponents(binary, connectivity)
+        return labels
 
 
 def draw_id_rect(canvas, idx, obj):
-    x, y, w, h = obj.getBbox()
-    canvas = cv2.rectangle(canvas, (x, y), (x+w, y+h), (0,255,0), 2)
-    cv2.putText(canvas, str(idx), (int(x+w/2), int(y+h/2)), cv2.FONT_HERSHEY_SIMPLEX, 2, (0,255,0))
+        x, y, w, h = obj.getBbox()
+        canvas = cv2.rectangle(canvas, (x, y), (x+w, y+h), (0,255,0), 2)
+        cv2.putText(canvas, str(idx), (int(x+w/2), int(y+h/2)), cv2.FONT_HERSHEY_SIMPLEX, 2, (0,255,0))
 
 # UTILITY FUNCTIONS ---------------------------------------------
 
 def track_objects(prev_objects, frame_objects, threshold, tracker):
-      # Initialize helper vairables
-      return_objects = []
-      # Iterate through previous objects
-      for o in range(0,len(prev_objects)):
-            min_distance = frame_width*frame_heigth
-            min_object = None
-            o_bbox = prev_objects[o].getBbox()
-            # Find the closest match in the current frame within a threshold
-            for i in range(0,len(frame_objects)):
-                  curr_object = frame_objects[i]
-                  i_bbox = frame_objects[i].getBbox()
-                  i_c = ((i_bbox[0]+i_bbox[2])/2, (i_bbox[1]+i_bbox[3])/2)
-                  o_c = ((o_bbox[0]+o_bbox[2])/2, (o_bbox[1]+o_bbox[3])/2)
-                  d = point_distance(o_c, i_c)
-                  if d < min_distance and d < threshold:
-                        min_distance = d
-                        min_object = curr_object
-            if min_object is not None:
-                  min_object.setID(prev_objects[o].getID())
-                  return_objects.append(min_object)
-      # Remove found objects
-      for i in range(0, len(return_objects)):
-            for o in frame_objects:
-                  if return_objects[i].getID() == o.getID():
-                        frame_objects.remove(o)
-                        break
-      # Mark the new objects
-      for i in range(0, len(frame_objects)):
-            obj = frame_objects[i]; obj.setID(tracker.getLastObjectID())
-            return_objects.append(obj)
-            tracker.addOneLastObjectID()
-      return return_objects
+        # Initialize helper vairables
+        return_objects = []
+        # Iterate through previous objects
+        for o in range(0,len(prev_objects)):
+                min_distance = frame_width*frame_heigth
+                min_object = None
+                o_bbox = prev_objects[o].getBbox()
+                # Find the closest match in the current frame within a threshold
+                for i in range(0,len(frame_objects)):
+                        curr_object = frame_objects[i]
+                        i_bbox = frame_objects[i].getBbox()
+                        i_c = ((i_bbox[0]+i_bbox[2])/2, (i_bbox[1]+i_bbox[3])/2)
+                        o_c = ((o_bbox[0]+o_bbox[2])/2, (o_bbox[1]+o_bbox[3])/2)
+                        d = point_distance(o_c, i_c)
+                        if d < min_distance and d < threshold:
+                                min_distance = d
+                                min_object = curr_object
+                if min_object is not None:
+                        min_object.setID(prev_objects[o].getID())
+                        min_object.setMask(prev_objects[o].getMask())
+                        return_objects.append(min_object)
+        # Remove found objects
+        for i in range(0, len(return_objects)):
+                for o in frame_objects:
+                        if return_objects[i].getID() == o.getID():
+                                frame_objects.remove(o)
+                                break
+        # Mark the new objects
+        for i in range(0, len(frame_objects)):
+                obj = frame_objects[i]; obj.setID(tracker.getLastObjectID())
+                return_objects.append(obj)
+                tracker.addOneLastObjectID()
+        return return_objects
 
     # If foreground (px, py) ==> True, otherwise False
 def look_backward( px, py, f_curr):
@@ -122,7 +123,7 @@ tracker = Tracker()
 #%% LOAD THE VIDEO
 
 v, frame_count, frame_heigth, frame_width = video.load_video('../videos/Test_Bird_1object.mp4')
-tracker.fillFrames(v)
+#tracker.fillFrames(v)
 
 
 #%% LOCAL FRAME DIFFERENCES
@@ -149,7 +150,6 @@ f_c = [cv2.dilate(f, kernel1, iterations = dilate_it) for f in f_c]
 f_c = [cv2.morphologyEx(f, cv2.MORPH_CLOSE, kernel2) for f in f_c]
 f_c = [cv2.erode(f, kernel1, iterations = dilate_it) for f in f_c]
 f_c = [cv2.dilate(f, kernel1, iterations = dilate_it) for f in f_c]
-#f_c = [cv2.erode(f, kernel1, iterations = dilate_it) for f in f_c]
 f_c = [cv2.morphologyEx(f, cv2.MORPH_OPEN, kernel2) for f in f_c]
 f_c = [cv2.morphologyEx(f, cv2.MORPH_CLOSE, kernel2) for f in f_c]
 
@@ -161,6 +161,11 @@ del(dilate_it)
 
 
 #video.show_video("video", f_c)
+
+
+#%% FILL THE TRACKER
+
+tracker.fillFrames(v, f_c)
 
 
 #%% COMPUTE CCL
@@ -185,7 +190,7 @@ for f in tqdm(range(0, len(f_ccl))):
 
 max_obj_number = sum([len(x) for x in f_o])
 
-  
+
 
 
 #%% MASK ID ASSIGNATION
@@ -196,7 +201,7 @@ for f in tqdm(range(0, len(f_o))):
     frame = tracker.getFrame(f)
     for c in range(0,len(f_o[f])):
         contours = cv2.findContours(f_o[f][c], 2, 2)[1][0]
-        frame.appendObject(cv2.boundingRect(contours))
+        frame.appendObject(cv2.boundingRect(contours), f_o[f][c])
 
 # # Show the bounding boxes
 #for f in tqdm(range(0, len(f_o))):
@@ -212,9 +217,6 @@ for f in tqdm(range(0, len(f_o))):
 
 
 # Assign an ID to each object-bbox -----------------------------------
-
-#frame = np.zeros((frame_heigth, frame_width, max_obj_number), dtype=np.float)
-#id_container = [copy.deepcopy(frame)]*frame_count
 
 f_o_rect_id = []
 id_frames = []
@@ -236,7 +238,7 @@ for f in tqdm(range(0, len(tracker.getFrames()))):
 
 
 
-# Write the videos for each of the objects -------------------------------
+#%% WRITE THE VIDEOS FOR EACH OF THE OBJECTS -------------------------------
 
 # Add all the objects to the object manager
 obj_manager = ObjectManager()
@@ -246,6 +248,10 @@ for f in tqdm(range(0, len(tracker.getFrames()))):
 
 # Compute the maximum bbox for each of the objects
 obj_manager.compute_obj_max_bboxes()
+
+for f in tqdm(range(0, len(tracker.getFrames()))):
+        frame = tracker.getFrame(f)
+        frame.setMask(f_c[f])
 
 # Get the frames for each of the objects and write the videos
 max_bboxes = obj_manager.getMaxBboxObjects()
@@ -259,6 +265,8 @@ for f in tqdm(range(0, len(tracker.getFrames()))):
             if y + video_bbox_h >= frame_heigth:
                   y = y - (y + video_bbox_h - frame_heigth)
             obj.setImage(frame.getImage()[y:(y+video_bbox_h), x:(x+video_bbox_w)])
+            obj.setMask(frame.getMask()[y:(y+video_bbox_h), x:(x+video_bbox_w)])
+            
       obj_manager.add_frame(frame.getObjects(),f)
 
 obj_manager.write_individual_videos("../output/objects/")
@@ -290,120 +298,3 @@ for f in tqdm(range(0,frame_count)):
                         if not foreground:
                               # assign the pixel as background
                               frame_background[f][i,j] = v[f][i,j] 
-
-
-
-#%% COMPRESSED FILE GENERATION
-
-print("GENERATING COMPRESSED VIDEO")
-
-output_dir = "../output/"
-
-frames = tracker.getFrames()
-file_metadata = open(output_dir + "metadata.16k", mode='w')
-
-# Write number and size of frames
-print("Writing frame count and size...")
-file_metadata.write(str(frame_count) + "\n")   
-file_metadata.write(str(frame_width) + "\n")   
-file_metadata.write(str(frame_heigth) + "\n")
-print("Done!")
-
-# Write background image
-print("Writing background image...")
-background = cv2.imread("background.png")
-cv2.imwrite(output_dir + "background.jpg", background)
-print("Done!")
-
-# Write each frame's objects
-print("Writing frames' objects...")
-for f in tqdm(range(0, frame_count)):
-      objects = []
-      frame = tracker.getFrame(f)
-      #print(len(frame.getObjects()).to_bytes(1,'big'))
-      #file_metadata.write(str(f) + "_" + str(len(frame.getObjects())) + "\n") 
-      for o in frame.getObjects():
-            x, y, w, h = o.getBbox()
-            file_metadata.write(str(f) + "_" + str(o.getID()) + "_" +  str(x) + "_" +  str(y) + "_" +  str(w) + "_" +  str(h) + "\n")
-            obj_img = frame.getImage()[y:(y+h), x:(x+w)]
-            cv2.imwrite(output_dir + "frames/" + str(f) + "_" + str(o.getID()) + ".jpg", obj_img)
-            
-print("Done!")
-
-
-file_metadata.close()
-
-print("The video has been saved!")
-      
-
-
-
-
-#%% DECOMPRESS VIDEO FILE
-
-print("DECOMPRESSING VIDEO FILE ---------------")
-
-file = open("output_video.16k", mode='r+b')
-byte_index = 12
-
-# Get number and size of frames
-print("Reading frame count and size...")
-comp_frame_count = int.from_bytes(file.read(4), 'big')
-comp_frame_width = int.from_bytes(file.read(2), 'big')
-comp_frame_heigth = int.from_bytes(file.read(2), 'big')
-print("Done!")
-
-# Read the background image
-print("Reading background image...")
-comp_back_heigth = int.from_bytes(file.read(2), 'big')
-comp_back_width = int.from_bytes(file.read(2), 'big')
-#back_size = comp_back_heigth * comp_back_width * 3
-#comp_encoded_background = np.frombuffer(file.read(back_size + 14*8), dtype=np.uint8)
-png_data, read_bytes = img_dec.read_bin_png(file, byte_index)
-byte_index += read_bytes
-#comp_background = cv2.imdecode(comp_encoded_background, cv2.IMREAD_ANYCOLOR) 
-comp_background = img_dec.decode_bin_png(png_data)
-print("Done!")
-
-
-# Read each frame's objects
-print("Reading frames' objects...")
-comp_video = []
-for f in tqdm(range(0,comp_frame_count)):
-      comp_f_obj_count = int.from_bytes(file.read(1), 'big')
-      print(byte_index)
-      byte_index += 1
-      frame_back = comp_background.copy()
-      for o in range(0, comp_f_obj_count):
-            comp_o_x = int.from_bytes(file.read(2), 'big')
-            comp_o_y = int.from_bytes(file.read(2), 'big')
-            comp_o_h = int.from_bytes(file.read(2), 'big')
-            comp_o_w = int.from_bytes(file.read(2), 'big')
-            byte_index += 8
-            #comp_o_img_size = comp_o_w * comp_o_h * 3
-            #comp_o_encoded_img = np.frombuffer(file.read(comp_o_img_size), dtype=np.uint8)
-            #comp_o_img = cv2.imdecode(comp_o_encoded_img, cv2.IMREAD_ANYCOLOR) 
-            png_data, read_bytes = img_dec.read_bin_png(file, byte_index)
-            byte_index += read_bytes
-            comp_o_img = img_dec.decode_bin_png(png_data)
-            frame_back[comp_o_x:comp_o_w, comp_o_y:comp_o_h] = comp_o_img
-            cv2.imshow("video", frame_back)
-            cv2.waitKey(30)
-      comp_video.append(frame_back)
-print("Done!")
-cv2.destroyAllWindows()
-file.close()
-
-
-
-#%% STUFF
-
-
-
-video.show_video("video", comp_video)
-
-
-
-
-
-
